@@ -11,7 +11,7 @@ RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID user
 
 ADD .ssh /home/user/.ssh
 RUN chown -R user:user /home/user/.ssh
-RUN chmod 600 /home/user/.ssh/id_rsa
+RUN chmod 600 /home/user/.ssh/id_rsa_for_git
 
 # ENV PATH $PATH:/home/user/.local/bin
 # ENV PYTHONPATH $PYTHONPATH:/home/user/.local/bin

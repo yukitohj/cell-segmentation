@@ -1,5 +1,5 @@
-IMAGE := "image_name"
-CONTAINER := container_name
+IMAGE := "y-nagano-cell-segmentation"
+CONTAINER := cell-segmentation
 
 docker-build:
 	docker build -t $(IMAGE) --build-arg USER_ID=$$(id -u) --build-arg GROUP_ID=$$(id -g) --build-arg WORKING_DIR=$$(pwd) .
