@@ -14,4 +14,4 @@ docker-attach:
 	docker attach $(CONTAINER)
 
 docker-attach-as-root:
-	docker exec -u root $(CONTAINE) /bin/bash
+	docker exec -it -u root $(CONTAINER) /bin/bash
