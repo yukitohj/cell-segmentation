@@ -2,3 +2,4 @@
 !.ssh/ADDKEYHERE
 data
 outputs
+__pycache__
