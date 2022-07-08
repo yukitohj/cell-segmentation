@@ -8,17 +8,13 @@ ARG GROUP_ID
 RUN addgroup --gid $GROUP_ID user
 RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID user
 
-
 ADD .ssh /home/user/.ssh
 RUN chown -R user:user /home/user/.ssh
-RUN chmod 600 /home/user/.ssh/id_rsa_for_git
-
-# ENV PATH $PATH:/home/user/.local/bin
-# ENV PYTHONPATH $PYTHONPATH:/home/user/.local/bin
+RUN chmod 600 /home/user/.ssh/id_rsa
 
 USER user
 COPY requirements.txt /tmp
+
+ENV PATH $PATH:/home/user/.local/bin
+
 RUN pip install --user -r /tmp/requirements.txt
-
-
-
