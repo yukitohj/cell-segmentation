@@ -1,1 +1,9 @@
 autopep8
+mlflow
+luigi
+segmentation-models-pytorch
+pandas
+hydra-core
+hydra-optuna-sweeper
+pytorch-ignite
+albumentations

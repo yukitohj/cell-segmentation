@@ -1,0 +1,30 @@
+defaults:
+  - override hydra/sweeper: optuna
+
+hydra:
+  sweeper:
+    n_trials: 10
+    direction: maximize
+    storage: null
+    study_name: tpe
+    n_jobs: 1
+    sampler:
+      seed: 0
+
+cellseg:
+  lr: 0.001
+  max_epochs: 5
+  seed: 0
+  model: 
+    arch: UnetPlusPlus
+    encoder_name: "resnet34"
+    in_channels: 3
+    classes: 1
+    encoder_weights: "imagenet"
+    encoder_depth: 5
+    activation: sigmoid
+  data:
+    train_test:
+      - ./data/raw/part1/pair.csv
+    predict:
+      - ./data/raw/part2/pair.csv
