@@ -9,7 +9,7 @@ import ignite
 def binary_one_hot_output_transform(output):
     y_pred, y = output
     y_pred = torch.squeeze(y_pred, dim=1)
-    y_pred = y_pred.sigmoid().round().long()
+    y_pred = y_pred.round().long()
     y_pred = ignite.utils.to_onehot(y_pred, 2)
     y = y.long()
     return y_pred, y
