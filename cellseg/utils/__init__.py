@@ -1,5 +1,5 @@
 
-def read_csvs(csv_paths: list, split=False, shuffle=False, seed=0):
+def get_filelists_from_csvs(csv_paths: list, split=False, shuffle=False, seed=0):
     import pandas as pd
     from hydra.utils import to_absolute_path
 

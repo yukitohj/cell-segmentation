@@ -8,13 +8,13 @@ from torch.utils.data import DataLoader
 from cellseg.metrics import get_metrics, to_loggable_metrics
 from cellseg.preprocess import get_argumentation, get_preprocess
 from albumentations import Compose
-from cellseg.utils import read_csvs
+from cellseg.utils import get_filelists_from_csvs
 import mlflow
 from .utils.dataset import create_dataset
 from PIL import Image
 
 
-def train(cfg: DictConfig):
+def train(cfg: DictConfig) -> float:
     model = smp.create_model(**cfg.cellseg.model).cuda()
 
     loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
@@ -23,7 +23,9 @@ def train(cfg: DictConfig):
     augumentation = get_argumentation()
     preprocess = get_preprocess(cfg.cellseg.data.img_size)
 
-    train, test = read_csvs(cfg.cellseg.data.train_test, split=True, shuffle=True, seed=cfg.cellseg.seed)
+    train, test = get_filelists_from_csvs(cfg.cellseg.data.train_test, split=True, shuffle=True, seed=cfg.cellseg.seed)
+
+    # eval用にはaugmentationsは適用しない
     train_dataset = create_dataset(train[0], train[1], Compose([augumentation, preprocess]))
     train_eval_dataset = create_dataset(train[0], train[1], preprocess)
     test_eval_dataset = create_dataset(test[0], test[1], preprocess)
@@ -63,7 +65,6 @@ def train(cfg: DictConfig):
         def save_image(evaluator):
             preds = evaluator.state.output[0]
             masks = evaluator.state.output[1]
-
             preds = preds.round().cpu().long().numpy()
             masks = masks.cpu().long().numpy()
             for i, pred in enumerate(preds):
@@ -77,3 +78,5 @@ def train(cfg: DictConfig):
             evaluator.run(test_eval_loader)
 
     trainer.run(train_loader, max_epochs=cfg.cellseg.max_epochs)
+    evaluator.run(test_eval_loader)
+    return evaluator.state.metrics['miou']
