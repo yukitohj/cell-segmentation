@@ -24,3 +24,15 @@ def get_metrics(loss_fn):
     loss = ignite.metrics.Loss(loss_fn)
     metrics = {"cm": cm, "dice": dice, "jaccard": jaccard, "iou": iou, "miou": miou, "loss": loss}
     return metrics
+
+
+def to_loggable_metrics(metrics, phase):
+    loggable = {}
+
+    for key, val in metrics.items():
+        key = phase+"_"+key
+        if isinstance(val, float):
+            loggable[key] = val
+        elif isinstance(val, torch.Tensor) and val.numel() == 1:
+            loggable[key] = val.numpy().item()
+    return loggable

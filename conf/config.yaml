@@ -13,8 +13,9 @@ hydra:
 
 cellseg:
   lr: 0.001
-  max_epochs: 5
+  max_epochs: 30
   seed: 0
+  batch_size: 4
   model: 
     arch: UnetPlusPlus
     encoder_name: "resnet34"
@@ -24,6 +25,7 @@ cellseg:
     encoder_depth: 5
     activation: sigmoid
   data:
+    img_size: 512
     train_test:
       - ./data/raw/part1/pair.csv
     predict:
