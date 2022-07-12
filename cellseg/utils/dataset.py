@@ -48,7 +48,7 @@ class RawDataset(torch.utils.data.Dataset):
         except:
             label = None
 
-        return np.array(input, dtype=int), np.array(label, dtype=int)
+        return np.array(input, dtype=np.uint8), np.array(label, dtype=np.uint8)
 
     def __len__(self):
         return len(self._input_paths)
