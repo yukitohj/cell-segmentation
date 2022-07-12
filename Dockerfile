@@ -12,6 +12,8 @@ ADD .ssh /home/user/.ssh
 RUN chown -R user:user /home/user/.ssh
 RUN chmod 600 /home/user/.ssh/id_rsa
 
+RUN chown user /opt/conda
+
 USER user
 COPY requirements.txt /tmp
 
