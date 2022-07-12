@@ -62,14 +62,18 @@ def train(cfg: DictConfig):
     def log_entire_results(trainer):
         def save_image(evaluator):
             preds = evaluator.state.output[0]
+            masks = evaluator.state.output[1]
+
             preds = preds.round().cpu().long().numpy()
+            masks = masks.cpu().long().numpy()
             for i, pred in enumerate(preds):
                 pred = pred.transpose(1, 2, 0)*255
+                mask = masks[i]*255
                 index = (evaluator.state.iteration-1)*cfg.cellseg.batch_size+i
                 mlflow.log_image(pred, f"predicted_{index}.png")
+                mlflow.log_image(mask, f"labelmask_{index}.png")
 
-        handler = evaluator.add_event_handler(engine.Events.ITERATION_COMPLETED, save_image)
-        evaluator.run(test_eval_loader)
-        handler.remove()
+        with evaluator.add_event_handler(engine.Events.ITERATION_COMPLETED, save_image):
+            evaluator.run(test_eval_loader)
 
     trainer.run(train_loader, max_epochs=cfg.cellseg.max_epochs)
