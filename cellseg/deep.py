@@ -45,57 +45,64 @@ def train(cfg: DictConfig) -> float:
     evaluator = engine.create_supervised_evaluator(model, metrics, "cuda")
     predictor = engine.create_supervised_evaluator(model, {}, "cuda")
 
-    @trainer.on(engine.Events.STARTED)
-    def log_sample_argumented_images(trainer):
-        for i in range(5):
-            img, mask = random.choice(train_dataset)
-            img = img.numpy().transpose(1, 2, 0)
-            mask = mask.numpy()*255
-            mlflow.log_image(img, f"sample/img{i}.png")
-            mlflow.log_image(mask, f"sample/mask{i}.png")
-
-    @trainer.on(engine.Events.EPOCH_COMPLETED)
-    def log_training_results(trainer):
-        evaluator.run(train_eval_loader)
-        metrics = to_loggable_metrics(evaluator.state.metrics, "train")
-        mlflow.log_metrics(metrics, trainer.state.epoch)
-
-    @trainer.on(engine.Events.EPOCH_COMPLETED)
-    def log_validation_results(trainer):
-        evaluator.run(test_eval_loader)
-        metrics = to_loggable_metrics(evaluator.state.metrics, "test")
-        mlflow.log_metrics(metrics, trainer.state.epoch)
-
-    @trainer.on(engine.Events.COMPLETED)
-    def log_entire_results(trainer):
-        def save_images(evaluator):
-            preds = evaluator.state.output[0]
-            masks = evaluator.state.output[1]
-            preds = preds.round().cpu().long().numpy()
-            masks = masks.cpu().long().numpy()
-            for i, pred in enumerate(preds):
-                pred = pred.transpose(1, 2, 0)*255
-                mask = masks[i]*255
-                index = (evaluator.state.iteration-1)*cfg.batch_size+i
-                mlflow.log_image(pred, f"test/predicted_{index}.png")
-                mlflow.log_image(mask, f"test/labelmask_{index}.png")
-
-        def save_image(predictor):
-            preds = predictor.state.output[0]
-            paths = predictor.state.output[1]
-            preds = preds.round().cpu().long().numpy()
-            for pred, path in zip(preds, paths):
-                name = os.path.basename(path)
-                pred = pred.transpose(1, 2, 0)*255
-                mlflow.log_image(pred, f"predict/{name}.png")
-
-        with evaluator.add_event_handler(engine.Events.ITERATION_COMPLETED, save_images):
-            evaluator.run(test_eval_loader)
-        with predictor.add_event_handler(engine.Events.ITERATION_COMPLETED, save_image):
-            predictor.run(only_pred_loader)
-
+    trainer.add_event_handler(engine.Events.STARTED, log_sample_argumented_images, train_dataset, 5)
+    trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_training_results, train_eval_loader, evaluator)
+    trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_validation_results, test_eval_loader, evaluator)
+    trainer.add_event_handler(engine.Events.COMPLETED, log_final_test_results, test_eval_loader, evaluator, cfg.batch_size)
+    trainer.add_event_handler(engine.Events.COMPLETED, log_predict_results, only_pred_loader, predictor)
     trainer.run(train_loader, max_epochs=cfg.max_epochs)
+
     evaluator.run(test_eval_loader)
     final_test_metrics = evaluator.state.metrics
     final_test_metrics = to_loggable_metrics(final_test_metrics, 'test')
     return final_test_metrics
+
+
+def log_sample_argumented_images(trainer, train_dataset, n_samples):
+    for i in range(n_samples):
+        img, mask = random.choice(train_dataset)
+        img = img.numpy().transpose(1, 2, 0)
+        mask = mask.numpy()*255
+        mlflow.log_image(img, f"sample/img{i}.png")
+        mlflow.log_image(mask, f"sample/mask{i}.png")
+
+
+def log_training_results(trainer, train_eval_loader, evaluator):
+    evaluator.run(train_eval_loader)
+    metrics = to_loggable_metrics(evaluator.state.metrics, "train")
+    mlflow.log_metrics(metrics, trainer.state.epoch)
+
+
+def log_validation_results(trainer, test_eval_loader, evaluator):
+    evaluator.run(test_eval_loader)
+    metrics = to_loggable_metrics(evaluator.state.metrics, "test")
+    mlflow.log_metrics(metrics, trainer.state.epoch)
+
+
+def log_final_test_results(trainer, test_eval_loader, evaluator, batch_size):
+    def save_images(evaluator):
+        preds = evaluator.state.output[0]
+        masks = evaluator.state.output[1]
+        preds = preds.round().cpu().long().numpy()
+        masks = masks.cpu().long().numpy()
+        for i, pred in enumerate(preds):
+            pred = pred.transpose(1, 2, 0)*255
+            mask = masks[i]*255
+            index = (evaluator.state.iteration-1)*batch_size+i
+            mlflow.log_image(pred, f"test/predicted_{index}.png")
+            mlflow.log_image(mask, f"test/labelmask_{index}.png")
+    with evaluator.add_event_handler(engine.Events.ITERATION_COMPLETED, save_images):
+        evaluator.run(test_eval_loader)
+
+
+def log_predict_results(trainer, only_pred_loader, predictor):
+    def save_image(predictor):
+        preds = predictor.state.output[0]
+        paths = predictor.state.output[1]
+        preds = preds.round().cpu().long().numpy()
+        for pred, path in zip(preds, paths):
+            name = os.path.basename(path)
+            pred = pred.transpose(1, 2, 0)*255
+            mlflow.log_image(pred, f"predict/{name}.png")
+    with predictor.add_event_handler(engine.Events.ITERATION_COMPLETED, save_image):
+        predictor.run(only_pred_loader)
