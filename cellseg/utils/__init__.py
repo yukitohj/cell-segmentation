@@ -1,3 +1,5 @@
+from .dataset import SegmentationDataset, ImageWithPathDataset
+
 
 def get_filelists_from_csvs(csv_paths: list, split=False, shuffle=False, seed=0):
     import pandas as pd

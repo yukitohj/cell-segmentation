@@ -1,10 +1,10 @@
 from typing import Tuple
-import torch.utils.data
-from PIL import Image
-from hydra.utils import to_absolute_path
+
 import albumentations
-import pandas as pd
 import numpy as np
+import torch.utils.data
+from hydra.utils import to_absolute_path
+from PIL import Image
 
 
 class RawDataset(torch.utils.data.Dataset):
@@ -40,58 +40,59 @@ class RawDataset(torch.utils.data.Dataset):
         # 入力画像がないという例外は許さない
         try:
             input = Image.open(to_absolute_path(self._input_paths[index])).convert("RGB")
+            input = np.array(input, dtype=np.uint8)
         except:
             raise
 
         # ラベル画像がないという例外はＯＫ.　predict専用のときなどは、ラベルがない．
         try:
             label = Image.open(to_absolute_path(self._label_paths[index])).convert('L')
+            label = np.array(label, dtype=np.uint8)
         except:
             label = None
 
-        return np.array(input, dtype=np.uint8), np.array(label, dtype=np.uint8)
+        return input, label
 
     def __len__(self) -> int:
         return len(self._input_paths)
 
 
-class SegmentationDataset(torch.utils.data.Dataset):
+class SegmentationDataset(RawDataset):
     """セグメンテーションモデル用のデータセット
     """
 
-    def __init__(self, dataset: torch.utils.data.Dataset, augmentation: albumentations.BasicTransform = None) -> None:
-        """セグメンテーション用処理を行ったデータセットを返します．
+    def __init__(self, input_paths: list, label_paths: list, transform: albumentations.BasicTransform = None) -> None:
+        super().__init__(input_paths, label_paths)
+        self._transform = transform
 
-        Args:
-            dataset (torch.utils.data.Dataset): 単純にPIL画像を返すようなDataset. RawDatasetを推奨.
-            augmentation (_type_): albumentationsで作成したtransformer
-        """
-        self._dataset = dataset
-        self._argument = augmentation
-
-    def __getitem__(self, index) -> Tuple:
-        image, mask = self._dataset[index]
-        if self._argument is not None:
-            argumented = self._argument(image=image, mask=mask)
-            image, mask = argumented['image'], argumented['mask']
-
+    def __getitem__(self, index: int) -> Tuple:
+        image, mask = super().__getitem__(index)
+        if self._transform is not None:
+            transformed = self._transform(image=image, mask=mask)
+            image, mask = transformed['image'], transformed['mask']
         return image, mask
 
     def __len__(self) -> int:
-        return len(self._dataset)
+        return super().__len__()
 
 
-def create_dataset(input_paths: list, label_paths: list, augmentation: albumentations.BasicTransform) -> torch.utils.data.Dataset:
-    """セグメンテーション用のデータセットを返します．
+class ImageWithPathDataset(RawDataset):
+    """画像とラベルとしてその画像のパスを返すようなデータセット
+    （画像、パス）
 
-    Args:
-        input_paths (list): 入力画像へのパスリスト．
-        label_paths (list): ラベル画像へのパスリスト.nanが含まれていてもよい.
-        augmentation (albumentations.BasicTransform): albumentationsで作成したtransformer
-
-    Returns:
-        torch.utils.data.Dataset: データセット
     """
-    dataset = RawDataset(input_paths, label_paths)
-    dataset = SegmentationDataset(dataset, augmentation)
-    return dataset
+
+    def __init__(self, input_paths: list, label_paths: list, transform: albumentations.BasicTransform = None) -> None:
+        super().__init__(input_paths, label_paths)
+        self._transform = transform
+
+    def __getitem__(self, index: int) -> Tuple:
+        image, _ = super().__getitem__(index)
+        path = to_absolute_path(self._input_paths[index])
+        if self._transform is not None:
+            image = self._transform(image=image)['image']
+        # print(image, path)
+        return image, path
+
+    def __len__(self) -> int:
+        return super().__len__()

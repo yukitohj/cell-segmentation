@@ -15,7 +15,7 @@ def log_params_recursive(cfg, prefix):
 @hydra.main(version_base=None, config_path='conf', config_name="config.yaml")
 def main(cfg: DictConfig) -> float:
     with mlflow.start_run():
-        log_params_recursive(cfg.cellseg, "")
+        log_params_recursive(cfg, "")
         results = cellseg.train(cfg)
     print(results)
     return 0.0
