@@ -62,14 +62,33 @@ class SegmentationDataset(RawDataset):
     """
 
     def __init__(self, input_paths: list, label_paths: list, transform: albumentations.BasicTransform = None) -> None:
+        """入力画像とラベル画像を読み込み、それらにtransformを適用して、返すDataset.
+
+        Args:
+            input_paths (list): 入力画像へのパスリスト.
+            label_paths (list): ラベル画像へのパスリスト.nanが含まれていてもよい.
+            transform (albumentations.BasicTransform, optional): _description_. Defaults to None.
+        """
         super().__init__(input_paths, label_paths)
         self._transform = transform
 
     def __getitem__(self, index: int) -> Tuple:
+        """indexに対応する画像を読み込み、transformを適用して返します.
+
+        Args:
+            index (int): 番地
+
+        Returns:
+            Tuple: transform後のデータ, transform後のマスク
+        """
         image, mask = super().__getitem__(index)
         if self._transform is not None:
-            transformed = self._transform(image=image, mask=mask)
-            image, mask = transformed['image'], transformed['mask']
+            if mask is None:
+                transformed = self._transform(image=image)
+                image = transformed['image']
+            else:
+                transformed = self._transform(image=image, mask=mask)
+                image, mask = transformed['image'], transformed['mask']
         return image, mask
 
     def __len__(self) -> int:
@@ -77,21 +96,34 @@ class SegmentationDataset(RawDataset):
 
 
 class ImageWithPathDataset(RawDataset):
-    """画像とラベルとしてその画像のパスを返すようなデータセット
-    （画像、パス）
+    """ラベルとして、その画像のフルパスを返すようなデータセット
 
     """
 
-    def __init__(self, input_paths: list, label_paths: list, transform: albumentations.BasicTransform = None) -> None:
-        super().__init__(input_paths, label_paths)
+    def __init__(self, input_paths: list, transform: albumentations.BasicTransform = None) -> None:
+        """入力画像を読み込み、transformを適用したものと、そのフルパスを返すDataset
+
+        Args:
+            input_paths (list): 入力画像へのパスリスト
+            transform (albumentations.BasicTransform, optional): _description_. Defaults to None.
+        """
+        dummy_label_paths = np.full(input_paths.shape, np.nan)
+        super().__init__(input_paths, dummy_label_paths)
         self._transform = transform
 
     def __getitem__(self, index: int) -> Tuple:
+        """indexに対応する画像を読み込み、transformを適用したものと、その画像のフルパスを返します．
+
+        Args:
+            index (int): 番地
+
+        Returns:
+            Tuple: transform後のデータ, パス
+        """
         image, _ = super().__getitem__(index)
         path = to_absolute_path(self._input_paths[index])
         if self._transform is not None:
             image = self._transform(image=image)['image']
-        # print(image, path)
         return image, path
 
     def __len__(self) -> int:

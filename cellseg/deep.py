@@ -32,7 +32,7 @@ def train(cfg: DictConfig) -> float:
     train_dataset = SegmentationDataset(train[0], train[1], Compose([augumentation, preprocess]))
     train_eval_dataset = SegmentationDataset(train[0], train[1], preprocess)
     test_eval_dataset = SegmentationDataset(test[0], test[1], preprocess)
-    only_pred_dataset = ImageWithPathDataset(only_pred[0], only_pred[1], preprocess)
+    only_pred_dataset = ImageWithPathDataset(only_pred[0], preprocess)
 
     train_loader = DataLoader(train_dataset, batch_size=cfg.batch_size)
     train_eval_loader = DataLoader(train_eval_dataset, batch_size=cfg.batch_size)
