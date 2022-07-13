@@ -35,3 +35,4 @@ data:
     - ./data/raw/part1/pair.csv
   predict:
     - ./data/raw/part2/pair.csv
+target: 'test_miou'

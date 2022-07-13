@@ -18,7 +18,7 @@ def main(cfg: DictConfig) -> float:
         log_params_recursive(cfg, "")
         results = cellseg.train(cfg)
     print(results)
-    return 0.0
+    return results[cfg.target]
 
 
 if __name__ == "__main__":

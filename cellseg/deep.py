@@ -96,4 +96,6 @@ def train(cfg: DictConfig) -> float:
 
     trainer.run(train_loader, max_epochs=cfg.max_epochs)
     evaluator.run(test_eval_loader)
-    return evaluator.state.metrics['miou']
+    final_test_metrics = evaluator.state.metrics
+    final_test_metrics = to_loggable_metrics(final_test_metrics, 'test')
+    return final_test_metrics
