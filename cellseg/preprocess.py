@@ -2,7 +2,15 @@ import albumentations as albu
 import albumentations.pytorch as albu_torch
 
 
-def get_preprocess(img_size):
+def get_preprocess(img_size) -> albu.BasicTransform:
+    """モデル入力に必要な前処理を返します．
+
+    Args:
+        img_size (_type_): 正方形にリサイズする際の一辺の長さ
+
+    Returns:
+        albu.BasicTransform: _description_
+    """
     return albu.Compose([
         albu.Resize(512, 512),
         albu.Normalize(),
@@ -11,7 +19,9 @@ def get_preprocess(img_size):
     ])
 
 
-def get_argumentation():
+def get_augmentation() -> albu.BasicTransform:
+    """データ拡張処理を返します．
+    """
     flip = albu.Flip()
     rotate = albu.RandomRotate90()
     blur = albu.OneOf([

@@ -11,17 +11,17 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
 from .metrics import get_metrics, to_loggable_metrics
-from .preprocess import get_argumentation, get_preprocess
+from .preprocess import get_augmentation, get_preprocess
 from .utils import get_filelists_from_csvs, ImageWithPathDataset, SegmentationDataset
 
 
-def train(cfg: DictConfig) -> float:
+def train(cfg: DictConfig) -> dict:
     model = smp.create_model(**cfg.model).cuda()
 
     loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr)
 
-    augumentation = get_argumentation()
+    augmentation = get_augmentation()
     preprocess = get_preprocess(cfg.data.img_size)
 
     train, test = get_filelists_from_csvs(cfg.data.train_test, split=True, shuffle=True, seed=cfg.seed)
@@ -29,7 +29,7 @@ def train(cfg: DictConfig) -> float:
 
     # eval用にはaugmentationsは適用しない
     # pred用はラベルがないこと前提
-    train_dataset = SegmentationDataset(train[0], train[1], Compose([augumentation, preprocess]))
+    train_dataset = SegmentationDataset(train[0], train[1], Compose([augmentation, preprocess]))
     train_eval_dataset = SegmentationDataset(train[0], train[1], preprocess)
     test_eval_dataset = SegmentationDataset(test[0], test[1], preprocess)
     only_pred_dataset = ImageWithPathDataset(only_pred[0], preprocess)
@@ -45,7 +45,7 @@ def train(cfg: DictConfig) -> float:
     evaluator = engine.create_supervised_evaluator(model, metrics, "cuda")
     predictor = engine.create_supervised_evaluator(model, {}, "cuda")
 
-    trainer.add_event_handler(engine.Events.STARTED, log_sample_argumented_images, train_dataset, 5)
+    trainer.add_event_handler(engine.Events.STARTED, log_sample_augmented_images, train_dataset, 5)
     trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_training_results, train_eval_loader, evaluator)
     trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_validation_results, test_eval_loader, evaluator)
     trainer.add_event_handler(engine.Events.COMPLETED, log_final_test_results, test_eval_loader, evaluator, cfg.batch_size)
@@ -58,7 +58,12 @@ def train(cfg: DictConfig) -> float:
     return final_test_metrics
 
 
-def log_sample_argumented_images(trainer, train_dataset, n_samples):
+def log_sample_augmented_images(trainer, train_dataset, n_samples):
+    """augment後の画像数枚をサンプルとして保存します.
+
+    Args:
+        n_samples (_type_): サンプルの枚数
+    """
     for i in range(n_samples):
         img, mask = random.choice(train_dataset)
         img = img.numpy().transpose(1, 2, 0)
@@ -68,18 +73,24 @@ def log_sample_argumented_images(trainer, train_dataset, n_samples):
 
 
 def log_training_results(trainer, train_eval_loader, evaluator):
+    """train画像に対するmetricsを保存します
+    """
     evaluator.run(train_eval_loader)
     metrics = to_loggable_metrics(evaluator.state.metrics, "train")
     mlflow.log_metrics(metrics, trainer.state.epoch)
 
 
 def log_validation_results(trainer, test_eval_loader, evaluator):
+    """test画像に対するmetricsを保存します
+    """
     evaluator.run(test_eval_loader)
     metrics = to_loggable_metrics(evaluator.state.metrics, "test")
     mlflow.log_metrics(metrics, trainer.state.epoch)
 
 
 def log_final_test_results(trainer, test_eval_loader, evaluator, batch_size):
+    """test画像を推論した結果を保存します.
+    """
     def save_images(evaluator):
         preds = evaluator.state.output[0]
         masks = evaluator.state.output[1]
@@ -96,6 +107,8 @@ def log_final_test_results(trainer, test_eval_loader, evaluator, batch_size):
 
 
 def log_predict_results(trainer, only_pred_loader, predictor):
+    """predict画像を推論した結果を保存します.
+    """
     def save_image(predictor):
         preds = predictor.state.output[0]
         paths = predictor.state.output[1]
