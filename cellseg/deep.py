@@ -1,6 +1,7 @@
 import os
 import random
-
+import ignite
+from ignite.contrib.engines.common import save_best_model_by_val_score
 import ignite.engine as engine
 import mlflow
 import segmentation_models_pytorch as smp
@@ -9,7 +10,7 @@ import torch.optim
 from albumentations import Compose
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
-
+import copy
 from .metrics import get_metrics, to_loggable_metrics
 from .preprocess import get_augmentation, get_preprocess
 from .utils import get_filelists_from_csvs, ImageWithPathDataset, SegmentationDataset
@@ -46,11 +47,14 @@ def train(cfg: DictConfig) -> dict:
     predictor = engine.create_supervised_evaluator(model, {}, "cuda")
 
     trainer.add_event_handler(engine.Events.STARTED, log_sample_augmented_images, train_dataset, 5)
-    trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_training_results, train_eval_loader, evaluator)
-    trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_validation_results, test_eval_loader, evaluator)
-    trainer.add_event_handler(engine.Events.COMPLETED, log_final_test_results, test_eval_loader, evaluator, cfg.batch_size)
-    trainer.add_event_handler(engine.Events.COMPLETED, log_predict_results, only_pred_loader, predictor)
+    trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_train_metrics, train_eval_loader, evaluator)
+    trainer.add_event_handler(engine.Events.EPOCH_COMPLETED, log_test_metrics, test_eval_loader, evaluator)
+    trainer.add_event_handler(engine.Events.COMPLETED, log_test_images, test_eval_loader, evaluator, cfg.batch_size)
+    trainer.add_event_handler(engine.Events.COMPLETED, log_pred_only_images, only_pred_loader, predictor)
+    trainer.add_event_handler(engine.Events.COMPLETED, save_model, model, cfg.model.arch)
     trainer.run(train_loader, max_epochs=cfg.max_epochs)
+
+    mlflow.get_artifact_uri()
 
     evaluator.run(test_eval_loader)
     final_test_metrics = evaluator.state.metrics
@@ -72,7 +76,7 @@ def log_sample_augmented_images(trainer, train_dataset, n_samples):
         mlflow.log_image(mask, f"sample/mask{i}.png")
 
 
-def log_training_results(trainer, train_eval_loader, evaluator):
+def log_train_metrics(trainer, train_eval_loader, evaluator):
     """train画像に対するmetricsを保存します
     """
     evaluator.run(train_eval_loader)
@@ -80,7 +84,7 @@ def log_training_results(trainer, train_eval_loader, evaluator):
     mlflow.log_metrics(metrics, trainer.state.epoch)
 
 
-def log_validation_results(trainer, test_eval_loader, evaluator):
+def log_test_metrics(trainer, test_eval_loader, evaluator):
     """test画像に対するmetricsを保存します
     """
     evaluator.run(test_eval_loader)
@@ -88,7 +92,7 @@ def log_validation_results(trainer, test_eval_loader, evaluator):
     mlflow.log_metrics(metrics, trainer.state.epoch)
 
 
-def log_final_test_results(trainer, test_eval_loader, evaluator, batch_size):
+def log_test_images(trainer, test_eval_loader, evaluator, batch_size):
     """test画像を推論した結果を保存します.
     """
     def save_images(evaluator):
@@ -106,7 +110,7 @@ def log_final_test_results(trainer, test_eval_loader, evaluator, batch_size):
         evaluator.run(test_eval_loader)
 
 
-def log_predict_results(trainer, only_pred_loader, predictor):
+def log_pred_only_images(trainer, only_pred_loader, predictor):
     """predict画像を推論した結果を保存します.
     """
     def save_image(predictor):
@@ -119,3 +123,12 @@ def log_predict_results(trainer, only_pred_loader, predictor):
             mlflow.log_image(pred, f"predict/{name}.png")
     with predictor.add_event_handler(engine.Events.ITERATION_COMPLETED, save_image):
         predictor.run(only_pred_loader)
+
+
+def save_model(trainer, model, arch):
+    model_path = os.path.join(mlflow.get_artifact_uri(), arch+".pth")
+    if model_path.startswith("file://"):
+        model_path = model_path[len("file://"):]
+    model = copy.deepcopy(model)
+    print(model_path)
+    torch.save(model.to('cpu').state_dict(), model_path)
