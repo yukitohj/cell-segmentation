@@ -9,8 +9,8 @@ RUN addgroup --gid $GROUP_ID user
 RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID user
 
 ADD .ssh /home/user/.ssh
-RUN chown -R user:user /home/user/.ssh
-RUN chmod 600 /home/user/.ssh/id_rsa
+RUN chown -R user:user /home/user/.ssh ; exit 0
+RUN chmod 600 /home/user/.ssh/id_rsa ; exit 0
 
 RUN chown user /opt/conda
 
